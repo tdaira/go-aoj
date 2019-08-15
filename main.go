@@ -1,18 +1,23 @@
 package main
 
 import (
+    "bufio"
     "fmt"
     "math"
+    "os"
     "sort"
+    "strconv"
+    "strings"
 )
 
 type Point struct {
-	x int64
-    y int64
+	x int
+    y int
+	connected bool
 }
 
 
-func (p Point) Dist(target *Point) int64 {
+func (p Point) Dist(target *Point) int {
     diffX := Abs(p.x - target.x)
     diffY := Abs(p.y - target.y)
     if diffX > diffY {
@@ -26,7 +31,7 @@ func (p Point) Eq(target *Point) bool {
     return p.x == target.x && p.y == target.y
 }
 
-func Abs(x int64) int64 {
+func Abs(x int) int {
 	if x < 0 {
 		return -x
 	}
@@ -34,7 +39,7 @@ func Abs(x int64) int64 {
 }
 
 
-type Points []Point
+type Points []*Point
 
 
 func (p Points) Len() int {
@@ -76,7 +81,7 @@ func createKdTree (points Points, depth int) *Node {
     axis := depth % 2
     if len(points) == 1 {
         return &Node{
-            &points[0],
+            points[0],
             axis,
             nil,
             nil,
@@ -84,14 +89,14 @@ func createKdTree (points Points, depth int) *Node {
     }
 
     // Select pivot for split.
-    pivotCandidate := []Point {
+    pivotCandidate := []*Point {
         points[0],
         points[len(points) / 2],
         points[len(points) - 1],
     }
 
     // Select pivot.
-    var pivot Point
+    var pivot *Point
     if axis == 0 {
         sort.Sort(ByX{pivotCandidate})
         pivot = pivotCandidate[1]
@@ -101,11 +106,11 @@ func createKdTree (points Points, depth int) *Node {
     pivot = pivotCandidate[1]
 
     // Delete pivot from slice.
-    if pivot.Eq(&points[0]) {
+    if pivot.Eq(points[0]) {
         points = points[1:]
-    } else if pivot.Eq(&points[len(points) / 2]) {
+    } else if pivot.Eq(points[len(points) / 2]) {
         points = append(points[:len(points) / 2], points[len(points) / 2 + 1:]...)
-    } else if pivot.Eq(&points[len(points) - 1]) {
+    } else if pivot.Eq(points[len(points) - 1]) {
         points = points[:len(points) - 1]
     }
 
@@ -142,13 +147,10 @@ func createKdTree (points Points, depth int) *Node {
         }
         points.Swap(leftIndex, rightIndex)
     }
-    fmt.Println("pivot: ", pivot)
-    fmt.Println("left: ", points[:leftIndex])
-    fmt.Println("right: ", points[leftIndex:])
 
     // Create node.
     return &Node{
-        &pivot,
+        pivot,
         axis,
         createKdTree(points[:leftIndex], depth + 1),
         createKdTree(points[leftIndex:], depth + 1),
@@ -156,13 +158,13 @@ func createKdTree (points Points, depth int) *Node {
 }
 
 func getNeighbor(node *Node, point *Point) *Point {
-	var minDist int64 = math.MaxInt64
-    var minPoint Point
+	var minDist = math.MaxInt64
+    var minPoint *Point
     searchKdTree(node, point, &minDist, &minPoint)
-    return &minPoint
+    return minPoint
 }
 
-func searchKdTree(node *Node, point *Point, minDist *int64, minPoint *Point)  {
+func searchKdTree(node *Node, point *Point, minDist *int, minPoint **Point)  {
     if node == nil {
         return
     }
@@ -170,9 +172,9 @@ func searchKdTree(node *Node, point *Point, minDist *int64, minPoint *Point)  {
     // Calc distance between current point and searching point.
     dist := point.Dist(node.current)
     // Update minimum point.
-    if dist < *minDist {
+    if dist < *minDist && !node.current.connected {
         *minDist = dist
-        *minPoint = *node.current
+        *minPoint = node.current
     }
 
     // Decide direction for depth-first search.
@@ -208,20 +210,66 @@ func searchKdTree(node *Node, point *Point, minDist *int64, minPoint *Point)  {
                 searchKdTree(node.left, point, minDist, minPoint)
             }
         }
+    } else {
+        diff := Abs(node.current.y - point.y)
+        if diff <= *minDist {
+            if dir == 0 {
+                searchKdTree(node.right, point, minDist, minPoint)
+            } else {
+                searchKdTree(node.left, point, minDist, minPoint)
+            }
+        }
     }
 
     return
 }
 
 func main() {
-    var points Points = []Point {
-        {1, 1},
-        {1, 10},
-        {10, 1},
-        {10, 10},
-        {100, 50},
-        {5, 5}}
+	var n int
+    fmt.Scan(&n)
+    points := make([]*Point, n)
+    sc := bufio.NewScanner(os.Stdin)
+    for i := 0; i < n; i++ {
+        sc.Scan()
+        input := strings.Split(sc.Text(), " ")
+        x, _ := strconv.Atoi(input[0])
+        y, _ := strconv.Atoi(input[1])
+        points[i] = &Point{
+            x: x,
+            y: y,
+            connected: false,
+        }
+    }
 
-    var tree = createKdTree(points, 0)
-    fmt.Println(getNeighbor(tree, &Point{80, 50}))
+    tree := createKdTree(points, 0)
+
+    total := 0
+    connected := map[*Point]bool{}
+    neighborMap := map[*Point]*Point{}
+    current := points[0]
+    current.connected = true
+    connected[current] = true
+    for i := 0; i < n-1; i++ {
+        n := getNeighbor(tree, current)
+        neighborMap[current] = n
+        minDist := math.MaxInt64
+        var minPoint *Point
+        for from, to := range neighborMap {
+            if _, ok := connected[to]; ok {
+                to = getNeighbor(tree, from)
+                neighborMap[from] = to
+            }
+            dist := from.Dist(to)
+            if dist < minDist {
+                minDist = dist
+                minPoint = to
+            }
+        }
+        total += minDist
+        current = minPoint
+        current.connected = true
+        connected[minPoint] = true
+    }
+
+    fmt.Println(total)
 }
