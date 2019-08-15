@@ -250,16 +250,16 @@ func main() {
     current.connected = true
     connected[current] = true
     for i := 0; i < n-1; i++ {
-        n := getNeighbor(tree, current)
-        neighborMap[current] = n
+        neighborMap[current] = getNeighbor(tree, current)
         minDist := math.MaxInt64
         var minPoint *Point
         for from, to := range neighborMap {
-            if _, ok := connected[to]; ok {
+            dist := from.Dist(to)
+            if _, ok := connected[to]; ok && dist < minDist {
                 to = getNeighbor(tree, from)
                 neighborMap[from] = to
+                dist = from.Dist(to)
             }
-            dist := from.Dist(to)
             if dist < minDist {
                 minDist = dist
                 minPoint = to
