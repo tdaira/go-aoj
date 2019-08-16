@@ -157,11 +157,11 @@ func createKdTree (points Points, depth int) *Node {
     }
 }
 
-func getNeighbor(node *Node, point *Point) *Point {
+func getNeighbor(node *Node, point *Point) (*Point, int) {
 	var minDist = math.MaxInt64
     var minPoint *Point
     searchKdTree(node, point, &minDist, &minPoint)
-    return minPoint
+    return minPoint, minDist
 }
 
 func searchKdTree(node *Node, point *Point, minDist *int, minPoint **Point)  {
@@ -224,6 +224,71 @@ func searchKdTree(node *Node, point *Point, minDist *int, minPoint **Point)  {
     return
 }
 
+type Edge struct {
+    distance int
+    from *Point
+    to *Point
+}
+
+type BinaryNode struct {
+    Value *Edge
+    Left  *BinaryNode
+    Right *BinaryNode
+    Finished bool
+}
+
+type BinaryTree struct {
+    Root *BinaryNode
+}
+
+func NewBinaryNode(val *Edge) *BinaryNode {
+    return &BinaryNode{val, nil, nil, false}
+}
+
+func (n *BinaryTree) Add(val *Edge) {
+    if n.Root == nil {
+        n.Root = NewBinaryNode(val)
+    } else {
+        n.Root.Add(val)
+    }
+}
+
+func (n *BinaryNode) Add(val *Edge) {
+    if val.distance <= n.Value.distance {
+        if n.Left != nil {
+            n.Left.Add(val)
+        } else {
+            n.Left = NewBinaryNode(val)
+        }
+    } else {
+        if n.Right != nil {
+            n.Right.Add(val)
+        } else {
+            n.Right = NewBinaryNode(val)
+        }
+    }
+}
+
+func (n *BinaryTree) GetMin() *Edge {
+    return n.Root.GetMin()
+}
+
+
+func (n *BinaryNode) GetMin() *Edge {
+    var min *Edge
+    if n.Left != nil {
+        min = n.Left.GetMin()
+    }
+    if min == nil && !n.Finished {
+        n.Finished = true
+        min = n.Value
+    }
+    if min == nil && n.Right != nil  {
+        min = n.Right.GetMin()
+    }
+    return min
+}
+
 func main() {
 	var n int
     fmt.Scan(&n)
@@ -245,30 +310,26 @@ func main() {
 
     total := 0
     connected := map[*Point]bool{}
-    neighborMap := map[*Point]*Point{}
     current := points[0]
     current.connected = true
     connected[current] = true
+    bt := new(BinaryTree)
     for i := 0; i < n-1; i++ {
-        neighborMap[current] = getNeighbor(tree, current)
-        minDist := math.MaxInt64
-        var minPoint *Point
-        for from, to := range neighborMap {
-            dist := from.Dist(to)
-            if _, ok := connected[to]; ok && dist < minDist {
-                to = getNeighbor(tree, from)
-                neighborMap[from] = to
-                dist = from.Dist(to)
-            }
-            if dist < minDist {
-                minDist = dist
-                minPoint = to
+        minPoint, minDistance := getNeighbor(tree, current)
+        bt.Add(&Edge{minDistance, current, minPoint})
+        var min *Edge
+        for {
+            min = bt.GetMin()
+            minPoint, minDistance := getNeighbor(tree, min.from)
+            bt.Add(&Edge{minDistance, min.from, minPoint})
+            if _, ok := connected[min.to]; !ok {
+               break
             }
         }
-        total += minDist
-        current = minPoint
+        total += min.distance
+        current = min.to
         current.connected = true
-        connected[minPoint] = true
+        connected[min.to] = true
     }
 
     fmt.Println(total)
