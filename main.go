@@ -13,7 +13,6 @@ import (
 type Point struct {
 	x int
     y int
-	connected bool
 }
 
 
@@ -157,14 +156,14 @@ func createKdTree (points Points, depth int) *Node {
     }
 }
 
-func getNeighbor(node *Node, point *Point) (*Point, int) {
+func getNeighbor(node *Node, point *Point) (*Node, int) {
 	var minDist = math.MaxInt64
-    var minPoint *Point
-    searchKdTree(node, point, &minDist, &minPoint)
-    return minPoint, minDist
+    var minNode *Node
+    searchKdTree(node, point, &minDist, &minNode)
+    return minNode, minDist
 }
 
-func searchKdTree(node *Node, point *Point, minDist *int, minPoint **Point)  {
+func searchKdTree(node *Node, point *Point, minDist *int, minNode **Node)  {
     if node == nil {
         return
     }
@@ -172,9 +171,9 @@ func searchKdTree(node *Node, point *Point, minDist *int, minPoint **Point)  {
     // Calc distance between current point and searching point.
     dist := point.Dist(node.current)
     // Update minimum point.
-    if dist < *minDist && !node.current.connected {
+    if dist < *minDist {
         *minDist = dist
-        *minPoint = node.current
+        *minNode = node
     }
 
     // Decide direction for depth-first search.
@@ -195,9 +194,9 @@ func searchKdTree(node *Node, point *Point, minDist *int, minPoint **Point)  {
 
     // Search high priority node.
     if dir == 0 {
-        searchKdTree(node.left, point, minDist, minPoint)
+        searchKdTree(node.left, point, minDist, minNode)
     } else {
-        searchKdTree(node.right, point, minDist, minPoint)
+        searchKdTree(node.right, point, minDist, minNode)
     }
 
     // Search secondary priority node if it has possibility of containing point.
@@ -205,23 +204,170 @@ func searchKdTree(node *Node, point *Point, minDist *int, minPoint **Point)  {
         diff := Abs(node.current.x - point.x)
         if diff <= *minDist {
             if dir == 0 {
-                searchKdTree(node.right, point, minDist, minPoint)
+                searchKdTree(node.right, point, minDist, minNode)
             } else {
-                searchKdTree(node.left, point, minDist, minPoint)
+                searchKdTree(node.left, point, minDist, minNode)
             }
         }
     } else {
         diff := Abs(node.current.y - point.y)
         if diff <= *minDist {
             if dir == 0 {
-                searchKdTree(node.right, point, minDist, minPoint)
+                searchKdTree(node.right, point, minDist, minNode)
             } else {
-                searchKdTree(node.left, point, minDist, minPoint)
+                searchKdTree(node.left, point, minDist, minNode)
             }
         }
     }
 
     return
+}
+
+func getMinNode(node *Node, axis int) *Node {
+    if node == nil {
+        return nil
+    }
+
+    var minNode = node
+    if node.axis == axis {
+        leftMinNode := getMinNode(node.left, axis)
+        if leftMinNode != nil {
+            if axis == 0 {
+                if leftMinNode.current.x < minNode.current.x {
+                    minNode = leftMinNode
+                }
+            } else {
+                if leftMinNode.current.y < minNode.current.y {
+                    minNode = leftMinNode
+                }
+            }
+        }
+    } else {
+        leftMinNode := getMinNode(node.left, axis)
+        if leftMinNode != nil {
+            if axis == 0 {
+                if leftMinNode.current.x < minNode.current.x {
+                    minNode = leftMinNode
+                }
+            } else {
+                if leftMinNode.current.y < minNode.current.y {
+                    minNode = leftMinNode
+                }
+            }
+        }
+        rightMinNode := getMinNode(node.right, axis)
+        if rightMinNode != nil {
+            if axis == 0 {
+                if rightMinNode.current.x < minNode.current.x {
+                    minNode = rightMinNode
+                }
+            } else {
+                if rightMinNode.current.y < minNode.current.y {
+                    minNode = rightMinNode
+                }
+            }
+        }
+    }
+
+    return minNode
+}
+
+func deleteNode(root *Node, point *Point) {
+    node, _ := getNeighbor(root, point)
+	leaf := deleteNodeRec(node)
+	minDist := math.MaxInt64
+    deleteLeafNode(root, leaf, &minDist)
+}
+
+func deleteNodeRec(node *Node) *Node {
+    minNode := node
+	if node.right != nil {
+        minNode = getMinNode(node.right, node.axis)
+        if minNode != nil {
+            node.current = minNode.current
+            return deleteNodeRec(minNode)
+        }
+    }
+	if node.left != nil && node.right == nil {
+        minNode := getMinNode(node.left, node.axis)
+        if minNode != nil {
+            node.current = minNode.current
+            node.right = node.left
+            node.left = nil
+            return deleteNodeRec(minNode)
+        }
+    }
+    // Return leaf node.
+    return node
+}
+
+func deleteLeafNode(node *Node, leaf *Node, minDist *int) {
+	if node == nil {
+	    return
+    }
+    if node.left != nil {
+        if node.left == leaf {
+            node.left = nil
+            return
+        }
+    }
+    if node.right != nil {
+        if node.right == leaf {
+            node.right = nil
+            return
+        }
+    }
+
+    // Calc distance between current point and searching point.
+    dist := leaf.current.Dist(node.current)
+    // Update minimum point.
+    if dist < *minDist {
+        *minDist = dist
+    }
+
+    // Decide direction for depth-first search.
+    var dir int
+    if node.axis == 0 {
+        if leaf.current.x < node.current.x {
+            dir = 0
+        } else {
+            dir = 1
+        }
+    } else {
+        if leaf.current.y < node.current.y {
+            dir = 0
+        } else {
+            dir = 1
+        }
+    }
+
+    // Search high priority node.
+    if dir == 0 {
+        deleteLeafNode(node.left, leaf, minDist)
+    } else {
+        deleteLeafNode(node.right, leaf, minDist)
+    }
+
+    // Search secondary priority node if it has possibility of containing point.
+    if node.axis == 0 {
+        diff := Abs(node.current.x - leaf.current.x)
+        if diff <= *minDist {
+            if dir == 0 {
+                deleteLeafNode(node.right, leaf, minDist)
+            } else {
+                deleteLeafNode(node.left, leaf, minDist)
+            }
+        }
+    } else {
+        diff := Abs(node.current.y - leaf.current.y)
+        if diff <= *minDist {
+            if dir == 0 {
+                deleteLeafNode(node.right, leaf, minDist)
+            } else {
+                deleteLeafNode(node.left, leaf, minDist)
+            }
+        }
+    }
 }
 
 type Edge struct {
@@ -302,34 +448,32 @@ func main() {
         points[i] = &Point{
             x: x,
             y: y,
-            connected: false,
         }
     }
 
-    tree := createKdTree(points, 0)
+    tree := createKdTree(points[1:], 0)
 
     total := 0
     connected := map[*Point]bool{}
     current := points[0]
-    current.connected = true
     connected[current] = true
     bt := new(BinaryTree)
     for i := 0; i < n-1; i++ {
-        minPoint, minDistance := getNeighbor(tree, current)
-        bt.Add(&Edge{minDistance, current, minPoint})
+        minNode, minDistance := getNeighbor(tree, current)
+        bt.Add(&Edge{minDistance, current, minNode.current})
         var min *Edge
         for {
             min = bt.GetMin()
-            minPoint, minDistance := getNeighbor(tree, min.from)
-            bt.Add(&Edge{minDistance, min.from, minPoint})
+            minNode, minDistance := getNeighbor(tree, min.from)
+            bt.Add(&Edge{minDistance, min.from, minNode.current})
             if _, ok := connected[min.to]; !ok {
                break
             }
         }
         total += min.distance
         current = min.to
-        current.connected = true
         connected[min.to] = true
+        deleteNode(tree, min.to)
     }
 
     fmt.Println(total)
