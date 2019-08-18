@@ -11,14 +11,13 @@ import (
 )
 
 type Point struct {
-	x int
-    y int
+	vals []int
 }
 
 
 func (p Point) Dist(target *Point) int {
-    diffX := Abs(p.x - target.x)
-    diffY := Abs(p.y - target.y)
+    diffX := Abs(p.vals[0] - target.vals[0])
+    diffY := Abs(p.vals[1] - target.vals[1])
     if diffX > diffY {
         return diffX
     } else {
@@ -27,7 +26,7 @@ func (p Point) Dist(target *Point) int {
 }
 
 func (p Point) Eq(target *Point) bool {
-    return p.x == target.x && p.y == target.y
+    return p.vals[0] == target.vals[0] && p.vals[1] == target.vals[1]
 }
 
 func Abs(x int) int {
@@ -54,7 +53,7 @@ type ByX struct {
 }
 
 func (p ByX) Less(i, j int) bool {
-    return p.Points[i].x < p.Points[j].x
+    return p.Points[i].vals[0] < p.Points[j].vals[0]
 }
 
 type ByY struct {
@@ -62,7 +61,7 @@ type ByY struct {
 }
 
 func (p ByY) Less(i, j int) bool {
-    return p.Points[i].y < p.Points[j].y
+    return p.Points[i].vals[1] < p.Points[j].vals[1]
 }
 
 type Node struct {
@@ -118,26 +117,14 @@ func createKdTree (points Points, depth int) *Node {
     rightIndex := len(points) - 1
     for {
         for leftIndex < len(points) {
-            if axis == 0 {
-                if points[leftIndex].x >= pivot.x {
-                    break
-                }
-            } else {
-                if points[leftIndex].y >= pivot.y {
-                    break
-                }
+            if points[leftIndex].vals[axis] >= pivot.vals[axis] {
+                break
             }
             leftIndex++
         }
         for rightIndex >= 0 {
-            if axis == 0 {
-                if points[rightIndex].x < pivot.x {
-                    break
-                }
-            } else {
-                if points[rightIndex].y < pivot.y {
-                    break
-                }
+            if points[rightIndex].vals[axis] < pivot.vals[axis] {
+                break
             }
             rightIndex--
         }
@@ -178,18 +165,10 @@ func searchKdTree(node *Node, point *Point, minDist *int, minNode **Node)  {
 
     // Decide direction for depth-first search.
     var dir int
-    if node.axis == 0 {
-        if point.x < node.current.x {
-            dir = 0
-        } else {
-        	dir = 1
-        }
+    if point.vals[node.axis] < node.current.vals[node.axis] {
+        dir = 0
     } else {
-        if point.y < node.current.y {
-            dir = 0
-        } else {
-            dir = 1
-        }
+        dir = 1
     }
 
     // Search high priority node.
@@ -200,23 +179,12 @@ func searchKdTree(node *Node, point *Point, minDist *int, minNode **Node)  {
     }
 
     // Search secondary priority node if it has possibility of containing point.
-    if node.axis == 0 {
-        diff := Abs(node.current.x - point.x)
-        if diff <= *minDist {
-            if dir == 0 {
-                searchKdTree(node.right, point, minDist, minNode)
-            } else {
-                searchKdTree(node.left, point, minDist, minNode)
-            }
-        }
-    } else {
-        diff := Abs(node.current.y - point.y)
-        if diff <= *minDist {
-            if dir == 0 {
-                searchKdTree(node.right, point, minDist, minNode)
-            } else {
-                searchKdTree(node.left, point, minDist, minNode)
-            }
+    diff := Abs(node.current.vals[node.axis] - point.vals[node.axis])
+    if diff <= *minDist {
+        if dir == 0 {
+            searchKdTree(node.right, point, minDist, minNode)
+        } else {
+            searchKdTree(node.left, point, minDist, minNode)
         }
     }
 
@@ -232,39 +200,21 @@ func getMinNode(node *Node, axis int) *Node {
     if node.axis == axis {
         leftMinNode := getMinNode(node.left, axis)
         if leftMinNode != nil {
-            if axis == 0 {
-                if leftMinNode.current.x < minNode.current.x {
-                    minNode = leftMinNode
-                }
-            } else {
-                if leftMinNode.current.y < minNode.current.y {
-                    minNode = leftMinNode
-                }
+            if leftMinNode.current.vals[axis] < minNode.current.vals[axis] {
+                minNode = leftMinNode
             }
         }
     } else {
         leftMinNode := getMinNode(node.left, axis)
         if leftMinNode != nil {
-            if axis == 0 {
-                if leftMinNode.current.x < minNode.current.x {
-                    minNode = leftMinNode
-                }
-            } else {
-                if leftMinNode.current.y < minNode.current.y {
-                    minNode = leftMinNode
-                }
+            if leftMinNode.current.vals[axis] < minNode.current.vals[axis] {
+                minNode = leftMinNode
             }
         }
         rightMinNode := getMinNode(node.right, axis)
         if rightMinNode != nil {
-            if axis == 0 {
-                if rightMinNode.current.x < minNode.current.x {
-                    minNode = rightMinNode
-                }
-            } else {
-                if rightMinNode.current.y < minNode.current.y {
-                    minNode = rightMinNode
-                }
+            if rightMinNode.current.vals[axis] < minNode.current.vals[axis] {
+                minNode = rightMinNode
             }
         }
     }
@@ -327,18 +277,10 @@ func deleteLeafNode(node *Node, leaf *Node, minDist *int) {
 
     // Decide direction for depth-first search.
     var dir int
-    if node.axis == 0 {
-        if leaf.current.x < node.current.x {
-            dir = 0
-        } else {
-            dir = 1
-        }
+    if leaf.current.vals[node.axis] < node.current.vals[node.axis] {
+        dir = 0
     } else {
-        if leaf.current.y < node.current.y {
-            dir = 0
-        } else {
-            dir = 1
-        }
+        dir = 1
     }
 
     // Search high priority node.
@@ -349,23 +291,12 @@ func deleteLeafNode(node *Node, leaf *Node, minDist *int) {
     }
 
     // Search secondary priority node if it has possibility of containing point.
-    if node.axis == 0 {
-        diff := Abs(node.current.x - leaf.current.x)
-        if diff <= *minDist {
-            if dir == 0 {
-                deleteLeafNode(node.right, leaf, minDist)
-            } else {
-                deleteLeafNode(node.left, leaf, minDist)
-            }
-        }
-    } else {
-        diff := Abs(node.current.y - leaf.current.y)
-        if diff <= *minDist {
-            if dir == 0 {
-                deleteLeafNode(node.right, leaf, minDist)
-            } else {
-                deleteLeafNode(node.left, leaf, minDist)
-            }
+    diff := Abs(node.current.vals[node.axis] - leaf.current.vals[node.axis])
+    if diff <= *minDist {
+        if dir == 0 {
+            deleteLeafNode(node.right, leaf, minDist)
+        } else {
+            deleteLeafNode(node.left, leaf, minDist)
         }
     }
 }
@@ -506,8 +437,7 @@ func main() {
         x, _ := strconv.Atoi(input[0])
         y, _ := strconv.Atoi(input[1])
         points[i] = &Point{
-            x: x,
-            y: y,
+            vals: []int{x, y},
         }
     }
 
