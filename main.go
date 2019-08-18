@@ -157,16 +157,14 @@ func createKdTree (points Points, depth int) *Node {
     }
 }
 
-func getNeighbor(node *Node, point *Point) (*Point, int, int) {
+func getNeighbor(node *Node, point *Point) (*Point, int) {
+	var minDist = math.MaxInt64
     var minPoint *Point
-    minDist := math.MaxInt64
-    searchCount := 0
-    searchKdTree(node, point, &minDist, &minPoint, &searchCount)
-    return minPoint, minDist, searchCount
+    searchKdTree(node, point, &minDist, &minPoint)
+    return minPoint, minDist
 }
 
-func searchKdTree(node *Node, point *Point, minDist *int, minPoint **Point, searchCount *int)  {
-    *searchCount += 1
+func searchKdTree(node *Node, point *Point, minDist *int, minPoint **Point)  {
     if node == nil {
         return
     }
@@ -197,9 +195,9 @@ func searchKdTree(node *Node, point *Point, minDist *int, minPoint **Point, sear
 
     // Search high priority node.
     if dir == 0 {
-        searchKdTree(node.left, point, minDist, minPoint, searchCount)
+        searchKdTree(node.left, point, minDist, minPoint)
     } else {
-        searchKdTree(node.right, point, minDist, minPoint, searchCount)
+        searchKdTree(node.right, point, minDist, minPoint)
     }
 
     // Search secondary priority node if it has possibility of containing point.
@@ -207,18 +205,18 @@ func searchKdTree(node *Node, point *Point, minDist *int, minPoint **Point, sear
         diff := Abs(node.current.x - point.x)
         if diff <= *minDist {
             if dir == 0 {
-                searchKdTree(node.right, point, minDist, minPoint, searchCount)
+                searchKdTree(node.right, point, minDist, minPoint)
             } else {
-                searchKdTree(node.left, point, minDist, minPoint, searchCount)
+                searchKdTree(node.left, point, minDist, minPoint)
             }
         }
     } else {
         diff := Abs(node.current.y - point.y)
         if diff <= *minDist {
             if dir == 0 {
-                searchKdTree(node.right, point, minDist, minPoint, searchCount)
+                searchKdTree(node.right, point, minDist, minPoint)
             } else {
-                searchKdTree(node.left, point, minDist, minPoint, searchCount)
+                searchKdTree(node.left, point, minDist, minPoint)
             }
         }
     }
@@ -308,38 +306,21 @@ func main() {
         }
     }
 
-    // Clone points
-    clonePoints := make([]*Point, len(points))
-    copy(clonePoints, points)
-    tree := createKdTree(clonePoints, 0)
+    tree := createKdTree(points, 0)
 
     total := 0
     connected := map[*Point]bool{}
     current := points[0]
     current.connected = true
     connected[current] = true
-    remained := points
     bt := new(BinaryTree)
     for i := 0; i < n-1; i++ {
-        minPoint, minDistance, searchCount := getNeighbor(tree, current)
-        if searchCount > 500 {
-            // Clone points
-            buf := remained
-            remained = nil
-            for _, point := range buf {
-                if !point.connected {
-                    remained = append(remained, point)
-                }
-            }
-            clonePoints := make([]*Point, len(remained))
-            copy(clonePoints, remained)
-            tree = createKdTree(clonePoints, 0)
-        }
+        minPoint, minDistance := getNeighbor(tree, current)
         bt.Add(&Edge{minDistance, current, minPoint})
         var min *Edge
         for {
             min = bt.GetMin()
-            minPoint, minDistance, _ := getNeighbor(tree, min.from)
+            minPoint, minDistance := getNeighbor(tree, min.from)
             bt.Add(&Edge{minDistance, min.from, minPoint})
             if _, ok := connected[min.to]; !ok {
                break
