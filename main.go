@@ -380,7 +380,6 @@ type BinaryNode struct {
     Value *Edge
     Left  *BinaryNode
     Right *BinaryNode
-    Finished bool
 }
 
 type BinaryTree struct {
@@ -388,7 +387,7 @@ type BinaryTree struct {
 }
 
 func NewBinaryNode(val *Edge) *BinaryNode {
-    return &BinaryNode{val, nil, nil, false}
+    return &BinaryNode{val, nil, nil}
 }
 
 func (n *BinaryTree) Add(val *Edge) {
@@ -414,6 +413,57 @@ func (n *BinaryNode) Add(val *Edge) {
         }
     }
 }
+func (n *BinaryTree) Delete(val *Edge) {
+	leaf := n.Root.SearchDelete(val)
+	if leaf != nil {
+        n.Root = n.Root.DeleteLeafNode(leaf)
+    }
+}
+
+func (n *BinaryNode) SearchDelete(val *Edge) *BinaryNode {
+	if val == n.Value {
+	    return n.Delete()
+    }
+    if val.distance <= n.Value.distance {
+        return n.Left.SearchDelete(val)
+    } else {
+        return n.Right.SearchDelete(val)
+    }
+}
+
+func (n *BinaryNode) Delete() *BinaryNode {
+	maxNode := n.Left.GetMaxNode()
+	if maxNode == nil {
+		if n.Right != nil {
+		    n.Value = n.Right.Value
+            n.Left = n.Right.Left
+            n.Right = n.Right.Right
+            return nil
+        }
+		return n
+    }
+    n.Value = maxNode.Value
+    return maxNode
+}
+
+func (n *BinaryNode) DeleteLeafNode(node *BinaryNode) *BinaryNode {
+	if n == node {
+		if n.Left != nil {
+		    return n.Left
+        }
+	    return nil
+    }
+    if node.Value.distance <= n.Value.distance {
+    	if n.Left != nil {
+            n.Left = n.Left.DeleteLeafNode(node)
+        }
+    } else {
+        if n.Right != nil {
+            n.Right = n.Right.DeleteLeafNode(node)
+        }
+    }
+	return n
+}
 
 func (n *BinaryTree) GetMin() *Edge {
     return n.Root.GetMin()
@@ -425,14 +475,24 @@ func (n *BinaryNode) GetMin() *Edge {
     if n.Left != nil {
         min = n.Left.GetMin()
     }
-    if min == nil && !n.Finished {
-        n.Finished = true
+    if min == nil {
         min = n.Value
     }
-    if min == nil && n.Right != nil  {
-        min = n.Right.GetMin()
-    }
     return min
+}
+
+func (n *BinaryNode) GetMaxNode() *BinaryNode {
+    var max *BinaryNode
+    if n == nil {
+        return nil
+    }
+    if n.Right != nil {
+        max = n.Right.GetMaxNode()
+    }
+    if max == nil {
+        max = n
+    }
+    return max
 }
 
 func main() {
@@ -464,11 +524,12 @@ func main() {
         var min *Edge
         for {
             min = bt.GetMin()
-            minNode, minDistance := getNeighbor(tree, min.from)
-            bt.Add(&Edge{minDistance, min.from, minNode.current})
             if _, ok := connected[min.to]; !ok {
                break
             }
+            bt.Delete(min)
+            minNode, minDistance := getNeighbor(tree, min.from)
+            bt.Add(&Edge{minDistance, min.from, minNode.current})
         }
         total += min.distance
         current = min.to
